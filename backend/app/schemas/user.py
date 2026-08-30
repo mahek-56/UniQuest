@@ -21,6 +21,9 @@ class UserBase(BaseModel):
     learning_goals: Optional[str] = None
     preferred_study_time: Optional[str] = None
     difficulty_preference: Optional[str] = None
+    onboarding_completed: bool = False
+    daily_study_target_minutes: int = 30
+    target_grade: Optional[str] = None
 
 
 class UserResponse(UserBase):
@@ -48,6 +51,22 @@ class UpdateProfileRequest(BaseModel):
     learning_goals: Optional[str] = None
     preferred_study_time: Optional[str] = None
     difficulty_preference: Optional[str] = None
+    daily_study_target_minutes: Optional[int] = None
+    target_grade: Optional[str] = None
+
+
+class OnboardingRequest(BaseModel):
+    """Payload sent by frontend onboarding flow."""
+    name: Optional[str] = None
+    avatar: Optional[str] = None
+    university: Optional[str] = None
+    department: Optional[str] = None
+    semester: Optional[int] = None
+    interests: Optional[str] = None          # comma-separated or JSON string
+    dailyStudyTargetMinutes: Optional[int] = None
+    targetGrade: Optional[str] = None
+    preferredStudyTime: Optional[str] = None
+    onboardingCompleted: Optional[bool] = True  # Frontend sends this field
 
 
 class UserStatsResponse(BaseModel):

@@ -28,3 +28,8 @@ class RevisionCompleteResponse(BaseModel):
     next_revision_date: date
     new_interval_days: int
     xp_earned: int
+
+
+class RevisionReviewRequest(BaseModel):
+    """Frontend sends {rating: 'again'|'hard'|'good'|'easy'}"""
+    rating: str

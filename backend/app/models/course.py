@@ -6,19 +6,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, TimestampMixin, UUIDMixin
+from app.database.base import Base, CrossDBUUID, TimestampMixin, UUIDMixin
 
 
 class Course(UUIDMixin, TimestampMixin, Base):
@@ -31,7 +22,7 @@ class Course(UUIDMixin, TimestampMixin, Base):
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(512))
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     modules: Mapped[list["Module"]] = relationship(
@@ -47,7 +38,7 @@ class Module(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "modules"
 
     course_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -64,7 +55,7 @@ class Lesson(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "lessons"
 
     module_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("modules.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text)
@@ -83,10 +74,10 @@ class CourseEnrollment(UUIDMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     course_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
     enrolled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

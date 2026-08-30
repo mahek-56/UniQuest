@@ -17,7 +17,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import RefreshToken, User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import AuthUserPayload, LoginRequest, RegisterRequest, TokenResponse
 from fastapi import HTTPException, status
 from jose import JWTError
 
@@ -28,8 +28,17 @@ def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
-    # Check for existing email
+def _make_token_response(user: User, access: str, refresh: str) -> TokenResponse:
+    """Build a TokenResponse with embedded user payload."""
+    return TokenResponse(
+        access_token=access,
+        refresh_token=refresh,
+        user=AuthUserPayload.model_validate(user),
+    )
+
+
+async def register_user(db: AsyncSession, payload: RegisterRequest) -> TokenResponse:
+    """Register a new user and return tokens + user (matching frontend contract)."""
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -53,8 +62,25 @@ async def register_user(db: AsyncSession, payload: RegisterRequest) -> User:
     from app.models.gamification import Streak
     db.add(Streak(user_id=user.id))
 
+    # Issue tokens immediately after registration
+    access = create_access_token(str(user.id))
+    refresh = create_refresh_token(str(user.id))
+
+    from datetime import timedelta
+    from app.core.config import settings
+
+    db.add(RefreshToken(
+        user_id=user.id,
+        token_hash=_hash_token(refresh),
+        expires_at=datetime.now(tz=timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.now(tz=timezone.utc),
+    ))
+
+    user.last_login = datetime.now(tz=timezone.utc)
+
     logger.info("User registered", user_id=str(user.id), email=user.email)
-    return user
+    return _make_token_response(user, access, refresh)
 
 
 async def login_user(db: AsyncSession, payload: LoginRequest) -> TokenResponse:
@@ -79,20 +105,18 @@ async def login_user(db: AsyncSession, payload: LoginRequest) -> TokenResponse:
     from datetime import timedelta
     from app.core.config import settings
 
-    token_row = RefreshToken(
+    db.add(RefreshToken(
         user_id=user.id,
         token_hash=_hash_token(refresh),
         expires_at=datetime.now(tz=timezone.utc)
         + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         created_at=datetime.now(tz=timezone.utc),
-    )
-    db.add(token_row)
+    ))
 
-    # Update last_login
     user.last_login = datetime.now(tz=timezone.utc)
 
     logger.info("User logged in", user_id=str(user.id))
-    return TokenResponse(access_token=access, refresh_token=refresh)
+    return _make_token_response(user, access, refresh)
 
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> str:
@@ -113,13 +137,38 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> str:
         )
     )
     token_row = result.scalar_one_or_none()
-    if not token_row or token_row.expires_at < datetime.now(tz=timezone.utc):
+    now_utc = datetime.now(tz=timezone.utc)
+    # Make expires_at timezone-aware if SQLite returned a naive datetime
+    if token_row and token_row.expires_at.tzinfo is None:
+        from datetime import timezone as tz_module
+        expires = token_row.expires_at.replace(tzinfo=tz_module.utc)
+    else:
+        expires = token_row.expires_at if token_row else None
+
+    if not token_row or expires < now_utc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token expired or revoked",
         )
 
-    return create_access_token(user_id)
+    # Rotate: revoke old token, issue new one
+    token_row.revoked = True
+
+    new_access = create_access_token(user_id)
+    new_refresh = create_refresh_token(user_id)
+
+    from datetime import timedelta
+    from app.core.config import settings
+
+    db.add(RefreshToken(
+        user_id=token_row.user_id,
+        token_hash=_hash_token(new_refresh),
+        expires_at=datetime.now(tz=timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.now(tz=timezone.utc),
+    ))
+
+    return new_access
 
 
 async def logout_user(db: AsyncSession, refresh_token: str) -> None:

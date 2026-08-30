@@ -7,10 +7,9 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, TimestampMixin, UUIDMixin
+from app.database.base import Base, CrossDBUUID, TimestampMixin, UUIDMixin
 
 
 class User(UUIDMixin, TimestampMixin, Base):
@@ -29,10 +28,15 @@ class User(UUIDMixin, TimestampMixin, Base):
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512))
 
     # Learning preferences
-    interests: Mapped[Optional[str]] = mapped_column(Text)        # comma-separated
+    interests: Mapped[Optional[str]] = mapped_column(Text)
     learning_goals: Mapped[Optional[str]] = mapped_column(Text)
-    preferred_study_time: Mapped[Optional[str]] = mapped_column(String(50))
+    preferred_study_time: Mapped[Optional[str]] = mapped_column(String(100))
     difficulty_preference: Mapped[Optional[str]] = mapped_column(String(50), default="medium")
+
+    # Onboarding / study goals
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    daily_study_target_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    target_grade: Mapped[Optional[str]] = mapped_column(String(10))
 
     # Gamification totals (updated by gamification service)
     xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -57,7 +61,7 @@ class RefreshToken(UUIDMixin, Base):
     __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

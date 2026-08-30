@@ -20,14 +20,11 @@ from app.schemas.course import (
     CourseResponse,
     CourseUpdate,
     EnrollResponse,
-    LessonCreate,
     LessonResponse,
-    LessonUpdate,
     ModuleCreate,
     ModuleResponse,
     ModuleUpdate,
 )
-from app.schemas.common import MessageResponse
 
 courses_router = APIRouter(prefix="/courses", tags=["courses"])
 modules_router = APIRouter(prefix="/modules", tags=["modules"])
@@ -238,6 +235,11 @@ async def start_lesson(lesson_id: UUID, current_user: CurrentUser, db: DBSession
 
 
 @lessons_router.post("/{lesson_id}/complete")
-async def complete_lesson(lesson_id: UUID, session_id: UUID, current_user: CurrentUser, db: DBSession):
+async def complete_lesson(
+    lesson_id: UUID,
+    current_user: CurrentUser,
+    db: DBSession,
+    session_id: Optional[UUID] = None,   # optional — frontend may not send it
+):
     from app.services.lesson_service import complete_lesson as svc_complete
     return await svc_complete(db, current_user, lesson_id, session_id)

@@ -5,6 +5,7 @@ to handle retries, errors, and API key validation.
 """
 
 import json
+import os
 from typing import Any, Optional
 
 from app.core.config import settings
@@ -12,18 +13,25 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-_client = None
+_configured = False
+
+
+def _ensure_configured():
+    global _configured
+    if not _configured:
+        api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY is not configured in .env")
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        os.environ["GOOGLE_API_KEY"] = api_key
+        _configured = True
 
 
 def _get_client():
-    global _client
-    if _client is None:
-        if not settings.GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY is not configured")
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        _client = genai.GenerativeModel("gemini-1.5-flash")
-    return _client
+    _ensure_configured()
+    import google.generativeai as genai
+    return genai.GenerativeModel("gemini-flash-lite-latest")
 
 
 async def generate_text(
@@ -39,24 +47,45 @@ async def generate_text(
     import asyncio
     import google.generativeai as genai
 
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=system_instruction,
-            generation_config=genai.GenerationConfig(
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-            ),
-        )
-        # Run blocking call in thread pool
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: model.generate_content(prompt),
-        )
-        return response.text
-    except Exception as exc:
-        logger.error("Gemini API error", error=str(exc))
-        raise
+    _ensure_configured()
+
+    models_to_try = [
+        "gemini-flash-lite-latest",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.7-flash",
+    ]
+    last_exc = None
+
+    for model_name in models_to_try:
+        try:
+            kwargs = {
+                "model_name": model_name,
+                "generation_config": genai.GenerationConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+            }
+            if system_instruction:
+                kwargs["system_instruction"] = system_instruction
+
+            model = genai.GenerativeModel(**kwargs)
+
+            # Run blocking call in thread pool (use get_running_loop for Python 3.10+)
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: model.generate_content(prompt),
+            )
+            return response.text
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Gemini model call failed, trying fallback", model=model_name, error=str(exc))
+
+    logger.error("All Gemini models failed", error=str(last_exc))
+    raise last_exc
 
 
 async def generate_json(

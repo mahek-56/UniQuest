@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from sqlalchemy import func, select
 
 from app.core.dependencies import CurrentUser, DBSession
-from app.models.course import Course, CourseEnrollment, Lesson, Module
+from app.models.course import CourseEnrollment, Lesson, Module
 from app.models.progress import UserProgress
 
 router = APIRouter(prefix="/progress", tags=["progress"])

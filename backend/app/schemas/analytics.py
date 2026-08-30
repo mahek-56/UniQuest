@@ -2,7 +2,8 @@
 Analytics response schemas.
 """
 
-from typing import Optional
+from datetime import datetime
+from typing import Any, Optional
 from pydantic import BaseModel
 
 
@@ -41,3 +42,16 @@ class WeakTopic(BaseModel):
 class StudyTimeBreakdown(BaseModel):
     date: str
     minutes: int
+
+
+class MLPredictionResponse(BaseModel):
+    """
+    ML performance prediction response.
+    Frontend analyticsApi.getMLPrediction() expects this structure.
+    """
+    prediction: str                          # "at_risk" | "average" | "strong" | "insufficient_data"
+    confidence: Optional[float] = None
+    key_factors: list[str] = []
+    timestamp: datetime
+    features_used: Optional[dict[str, Any]] = None
+    message: Optional[str] = None

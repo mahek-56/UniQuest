@@ -97,6 +97,7 @@ def _get_model():
                         max_depth=8,
                         random_state=42,
                         class_weight="balanced",
+                        n_jobs=1,
                     )),
                 ])
                 pipe.fit(X, y)

@@ -3,6 +3,7 @@ Lesson start / complete logic with XP rewards and study session tracking.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -61,7 +62,7 @@ async def complete_lesson(
     db: AsyncSession,
     user: User,
     lesson_id: UUID,
-    session_id: UUID,
+    session_id: Optional[UUID],
 ) -> dict:
     result = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
     lesson = result.scalar_one_or_none()
@@ -110,14 +111,17 @@ async def complete_lesson(
 
         await gs.check_and_unlock_achievements(db, user)
 
-    # Close study session
-    session_result = await db.execute(
-        select(StudySession).where(
-            StudySession.id == session_id,
-            StudySession.user_id == user.id,
+    # Close study session if one was provided
+    session = None
+    if session_id:
+        session_result = await db.execute(
+            select(StudySession).where(
+                StudySession.id == session_id,
+                StudySession.user_id == user.id,
+            )
         )
-    )
-    session = session_result.scalar_one_or_none()
+        session = session_result.scalar_one_or_none()
+
     if session:
         session.ended_at = now
         session.duration_seconds = int((now - session.started_at).total_seconds())

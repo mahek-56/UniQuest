@@ -8,10 +8,9 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base, TimestampMixin, UUIDMixin
+from app.database.base import Base, CrossDBJSON, CrossDBUUID, TimestampMixin, UUIDMixin
 
 
 class Quiz(UUIDMixin, TimestampMixin, Base):
@@ -24,15 +23,14 @@ class Quiz(UUIDMixin, TimestampMixin, Base):
     time_limit_minutes: Mapped[Optional[int]] = mapped_column(Integer)
     pass_score: Mapped[float] = mapped_column(Float, nullable=False, default=60.0)
 
-    # Optional links to course structure
     module_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="SET NULL"), nullable=True, index=True
+        CrossDBUUID, ForeignKey("modules.id", ondelete="SET NULL"), nullable=True, index=True
     )
     lesson_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
+        CrossDBUUID, ForeignKey("lessons.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     questions: Mapped[list["Question"]] = relationship(
@@ -47,11 +45,10 @@ class Question(UUIDMixin, Base):
     __tablename__ = "questions"
 
     quiz_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    # options stored as JSONB list: [{"key": "a", "text": "..."}, ...]
-    options: Mapped[list] = mapped_column(JSONB, nullable=False)
+    options: Mapped[list] = mapped_column(CrossDBJSON, nullable=False)
     correct_answer: Mapped[str] = mapped_column(String(10), nullable=False)
     explanation: Mapped[Optional[str]] = mapped_column(Text)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -63,14 +60,13 @@ class QuizAttempt(UUIDMixin, Base):
     __tablename__ = "quiz_attempts"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     quiz_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # answers: {"question_id": "chosen_key", ...}
-    answers: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    score: Mapped[float] = mapped_column(Float, nullable=False)           # 0–100
+    answers: Mapped[dict] = mapped_column(CrossDBJSON, nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
     correct_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_questions: Mapped[int] = mapped_column(Integer, nullable=False)
     time_taken_seconds: Mapped[Optional[int]] = mapped_column(Integer)

@@ -2,7 +2,7 @@
 Shared Pydantic schemas and response helpers.
 """
 
-from typing import Any, Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 from pydantic import BaseModel
 
 DataT = TypeVar("DataT")

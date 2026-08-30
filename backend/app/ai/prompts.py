@@ -33,20 +33,21 @@ Student information:
 - Daily study hours available: {daily_hours}
 - Goals: {goals}
 
-Generate a JSON study plan with this structure:
+Generate a weekly JSON study plan matching this exact structure:
 {{
-  "summary": "brief overview string",
-  "total_days": integer,
-  "daily_sessions": [
+  "scheduleSummary": "Brief motivating overview of the weekly study strategy",
+  "weeklyGoalHours": {daily_hours} * 6,
+  "days": [
     {{
-      "day": 1,
-      "date": "YYYY-MM-DD",
-      "sessions": [
+      "dayName": "Monday",
+      "focusSubject": "Subject Name",
+      "theme": "Focus theme for the day",
+      "color": "#0055DA",
+      "blocks": [
         {{
-          "subject": "string",
-          "topic": "string",
-          "duration_minutes": integer,
-          "activity_type": "read | practice | review | mock_test"
+          "time": "6:00 PM - 7:30 PM",
+          "task": "Specific learning or problem solving task",
+          "xp": 40
         }}
       ]
     }}

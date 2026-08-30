@@ -42,12 +42,14 @@ def _create_token(
     expires_delta: timedelta,
     extra: dict[str, Any] | None = None,
 ) -> str:
+    import uuid
     now = datetime.now(tz=timezone.utc)
     payload: dict[str, Any] = {
         "sub": subject,
         "type": token_type,
         "iat": now,
         "exp": now + expires_delta,
+        "jti": str(uuid.uuid4()),   # unique per token — prevents hash collisions
     }
     if extra:
         payload.update(extra)

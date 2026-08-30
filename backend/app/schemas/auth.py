@@ -2,6 +2,10 @@
 Auth request/response schemas.
 """
 
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -33,10 +37,34 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AuthUserPayload(BaseModel):
+    """User data embedded in auth responses (what frontend expects)."""
+    id: UUID
+    email: str
+    full_name: str
+    university: Optional[str] = None
+    department: Optional[str] = None
+    semester: Optional[int] = None
+    avatar_url: Optional[str] = None
+    role: str
+    xp: int
+    level: int
+    coins: int
+    onboarding_completed: bool = False
+    daily_study_target_minutes: int = 30
+    target_grade: Optional[str] = None
+    interests: Optional[str] = None
+    preferred_study_time: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: Optional[AuthUserPayload] = None
 
 
 class RefreshRequest(BaseModel):

@@ -7,29 +7,21 @@ from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean,
-    Date,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
+    Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base, TimestampMixin, UUIDMixin
+from app.database.base import Base, CrossDBUUID, TimestampMixin, UUIDMixin
 
 
 class XPHistory(UUIDMixin, Base):
     __tablename__ = "xp_history"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    source: Mapped[str] = mapped_column(String(100), nullable=False)   # e.g. "lesson_complete"
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -38,9 +30,9 @@ class CoinTransaction(UUIDMixin, Base):
     __tablename__ = "coin_transactions"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    amount: Mapped[int] = mapped_column(Integer, nullable=False)        # positive or negative
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
     transaction_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -51,7 +43,7 @@ class Streak(UUIDMixin, Base):
     __table_args__ = (UniqueConstraint("user_id", name="uq_streak_user"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     current_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     longest_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -76,10 +68,10 @@ class UserAchievement(UUIDMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     achievement_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("achievements.id", ondelete="CASCADE"), nullable=False
+        CrossDBUUID, ForeignKey("achievements.id", ondelete="CASCADE"), nullable=False
     )
     unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -104,13 +96,14 @@ class UserQuest(UUIDMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     quest_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quests.id", ondelete="CASCADE"), nullable=False
+        CrossDBUUID, ForeignKey("quests.id", ondelete="CASCADE"), nullable=False
     )
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    claimed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     assigned_date: Mapped[date] = mapped_column(Date, nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
@@ -129,10 +122,10 @@ class UserReward(UUIDMixin, Base):
     __tablename__ = "user_rewards"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     reward_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("rewards.id", ondelete="CASCADE"), nullable=False
+        CrossDBUUID, ForeignKey("rewards.id", ondelete="CASCADE"), nullable=False
     )
     redeemed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -144,10 +137,10 @@ class LeaderboardSnapshot(UUIDMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        CrossDBUUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    period_type: Mapped[str] = mapped_column(String(50), nullable=False)   # weekly/global/etc.
-    period_key: Mapped[str] = mapped_column(String(50), nullable=False)    # e.g. "2025-W01"
+    period_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    period_key: Mapped[str] = mapped_column(String(50), nullable=False)
     xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rank: Mapped[Optional[int]] = mapped_column(Integer)
     university: Mapped[Optional[str]] = mapped_column(String(255))

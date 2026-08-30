@@ -10,21 +10,62 @@ from pydantic import BaseModel
 
 
 class TutorRequest(BaseModel):
-    question: str
-    context: Optional[str] = None        # lesson content or subject context
+    # Frontend sends: { message, subject, history }
+    message: Optional[str] = None          # frontend field name
+    question: Optional[str] = None         # legacy backend field
+    context: Optional[str] = None
     subject: Optional[str] = None
+    history: list[dict] = []               # conversation history from frontend
+
+    @property
+    def effective_question(self) -> str:
+        """Return whichever question field is populated."""
+        return self.message or self.question or ""
 
 
 class TutorResponse(BaseModel):
-    answer: str
-    follow_up_suggestions: list[str] = []
+    # Frontend expects: { reply, timestamp, suggestedFollowUps }
+    reply: str
+    answer: Optional[str] = None          # legacy field alias
+    timestamp: Optional[str] = None
+    suggestedFollowUps: list[str] = []
+    follow_up_suggestions: list[str] = [] # legacy alias
 
 
 class StudyPlanRequest(BaseModel):
-    subjects: list[str]
-    exam_date: Optional[str] = None      # ISO date string
-    daily_hours: float = 2.0
+    # Frontend fields (camelCase)
+    dailyHours: Optional[float] = None
+    targetGrade: Optional[str] = None
+    weakTopics: Optional[list[str]] = None
+    deadlines: Optional[list[str]] = None
+
+    # Backend/legacy fields (snake_case)
+    subjects: Optional[list[str]] = None
+    exam_date: Optional[str] = None
+    daily_hours: Optional[float] = None
     goals: Optional[str] = None
+
+    # Resolved fields — computed after init
+    effective_daily_hours: float = 2.0
+    effective_subjects: list[str] = []
+
+    model_config = {"populate_by_name": True}
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        instance = super().model_validate(obj, **kwargs)
+        instance.effective_daily_hours = instance.dailyHours or instance.daily_hours or 2.0
+        instance.effective_subjects = instance.subjects or [
+            "DBMS", "Operating Systems", "DSA", "Computer Networks", "AI/ML"
+        ]
+        return instance
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.effective_daily_hours = self.dailyHours or self.daily_hours or 2.0
+        self.effective_subjects = self.subjects or [
+            "DBMS", "Operating Systems", "DSA", "Computer Networks", "AI/ML"
+        ]
 
 
 class StudyPlanResponse(BaseModel):
@@ -35,11 +76,25 @@ class StudyPlanResponse(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    id: UUID
-    recommendation_type: str
-    content: dict[str, Any]
+    """
+    Frontend expects: { id, type, subject, title, reason, duration, xpPotential,
+                        difficulty, badge, actionUrl, actionLabel }
+    """
+    id: Any                               # UUID or string
+    type: Optional[str] = None            # frontend field
+    recommendation_type: Optional[str] = None  # backend field
+    subject: Optional[str] = None
+    title: Optional[str] = None
+    reason: Optional[str] = None
+    duration: Optional[str] = None
+    xpPotential: Optional[int] = None
+    difficulty: Optional[str] = None
+    badge: Optional[str] = None
+    actionUrl: Optional[str] = None
+    actionLabel: Optional[str] = None
+    content: Optional[dict[str, Any]] = None
     ai_explanation: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

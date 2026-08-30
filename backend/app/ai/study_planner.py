@@ -22,10 +22,10 @@ async def generate_study_plan(
     payload: StudyPlanRequest,
 ) -> StudyPlanResponse:
     prompt = STUDY_PLAN_USER.format(
-        subjects=", ".join(payload.subjects),
+        subjects=", ".join(payload.effective_subjects),
         exam_date=payload.exam_date or "not specified",
-        daily_hours=payload.daily_hours,
-        goals=payload.goals or "general preparation",
+        daily_hours=payload.effective_daily_hours,
+        goals=payload.goals or f"Target grade: {payload.targetGrade or 'A'}. General exam preparation.",
     )
 
     try:
@@ -45,7 +45,7 @@ async def generate_study_plan(
     now = datetime.now(tz=timezone.utc)
 
     # Deactivate previous plans
-    from sqlalchemy import select, update
+    from sqlalchemy import update
     await db.execute(
         update(StudyPlan)
         .where(StudyPlan.user_id == user_id, StudyPlan.is_active == True)  # noqa: E712

@@ -2,7 +2,7 @@
 Gamification endpoints: /api/v1/gamification
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -13,7 +13,6 @@ from app.core.dependencies import CurrentUser, DBSession
 from app.models.gamification import (
     Achievement,
     CoinTransaction,
-    LeaderboardSnapshot,
     Quest,
     Reward,
     Streak,
@@ -27,8 +26,10 @@ from app.schemas.gamification import (
     AchievementResponse,
     CoinBalanceResponse,
     CoinHistoryItem,
+    GamificationStatsResponse,
     LeaderboardEntry,
     LeaderboardResponse,
+    QuestClaimResponse,
     QuestResponse,
     RedeemRequest,
     RedeemResponse,
@@ -36,10 +37,42 @@ from app.schemas.gamification import (
     StreakResponse,
     XPHistoryItem,
 )
-from app.services.gamification_service import deduct_coins, get_level_info
+from app.services.gamification_service import award_coins, award_xp, deduct_coins, get_level_info
 
 router = APIRouter(prefix="/gamification", tags=["gamification"])
 
+
+# ── Combined stats (frontend: gamificationApi.getStats) ──────────────────────
+
+@router.get("/stats", response_model=GamificationStatsResponse)
+async def get_gamification_stats(current_user: CurrentUser, db: DBSession):
+    """Combined endpoint: XP, coins, streak, level, rank — matches frontend contract."""
+    user = current_user
+
+    streak_r = await db.execute(select(Streak).where(Streak.user_id == user.id))
+    streak = streak_r.scalar_one_or_none()
+    current_streak = streak.current_streak if streak else 0
+
+    # Simple rank: count users with more XP + 1
+    rank_r = await db.execute(
+        select(func.count(User.id)).where(User.xp > user.xp)
+    )
+    rank = int(rank_r.scalar() or 0) + 1
+
+    level_info = get_level_info(user.xp)
+
+    return GamificationStatsResponse(
+        xp=user.xp,
+        coins=user.coins,
+        streak=current_streak,
+        level=user.level,
+        level_title=level_info.get("title", "Beginner"),
+        rank=rank,
+        xp_to_next_level=level_info.get("xp_to_next", 0),
+    )
+
+
+# ── XP ────────────────────────────────────────────────────────────────────────
 
 @router.get("/xp", response_model=list[XPHistoryItem])
 async def get_xp_history(current_user: CurrentUser, db: DBSession):
@@ -56,6 +89,8 @@ async def get_xp_history(current_user: CurrentUser, db: DBSession):
 async def get_level(current_user: CurrentUser):
     return get_level_info(current_user.xp)
 
+
+# ── Coins ─────────────────────────────────────────────────────────────────────
 
 @router.get("/coins", response_model=CoinBalanceResponse)
 async def get_coins(current_user: CurrentUser, db: DBSession):
@@ -81,16 +116,34 @@ async def redeem_reward(payload: RedeemRequest, current_user: CurrentUser, db: D
     if not reward:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reward not found")
 
-    remaining = await deduct_coins(db, current_user, reward.cost_coins, f"Redeemed: {reward.name}")
-    db.add(UserReward(user_id=current_user.id, reward_id=reward.id,
-                      redeemed_at=__import__('datetime').datetime.now(
-                          tz=__import__('datetime').timezone.utc)))
+    # Check for duplicate redemption
+    already = await db.execute(
+        select(UserReward).where(
+            UserReward.user_id == current_user.id,
+            UserReward.reward_id == reward.id,
+        )
+    )
+    if already.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Reward already redeemed",
+        )
+
+    user = await db.merge(current_user)
+    remaining = await deduct_coins(db, user, reward.cost_coins, f"Redeemed: {reward.name}")
+    db.add(UserReward(
+        user_id=user.id,
+        reward_id=reward.id,
+        redeemed_at=datetime.now(tz=timezone.utc),
+    ))
     return RedeemResponse(
         message="Reward redeemed successfully",
         reward=RewardResponse.model_validate(reward),
         coins_remaining=remaining,
     )
 
+
+# ── Achievements ──────────────────────────────────────────────────────────────
 
 @router.get("/achievements", response_model=list[AchievementResponse])
 async def get_achievements(current_user: CurrentUser, db: DBSession):
@@ -118,6 +171,8 @@ async def get_achievements(current_user: CurrentUser, db: DBSession):
     ]
 
 
+# ── Quests ────────────────────────────────────────────────────────────────────
+
 @router.get("/quests", response_model=list[QuestResponse])
 async def get_quests(current_user: CurrentUser, db: DBSession):
     from app.services.gamification_service import assign_daily_quests
@@ -142,6 +197,7 @@ async def get_quests(current_user: CurrentUser, db: DBSession):
             coin_reward=row.Quest.coin_reward,
             progress=row.UserQuest.progress,
             completed=row.UserQuest.completed,
+            claimed=row.UserQuest.claimed if hasattr(row.UserQuest, "claimed") else row.UserQuest.completed,
             assigned_date=row.UserQuest.assigned_date,
             completed_at=row.UserQuest.completed_at,
         )
@@ -149,18 +205,99 @@ async def get_quests(current_user: CurrentUser, db: DBSession):
     ]
 
 
+@router.post("/quests/{quest_id}/claim", response_model=QuestClaimResponse)
+async def claim_quest_reward(quest_id: UUID, current_user: CurrentUser, db: DBSession):
+    """
+    Claim rewards for a completed quest. Backend verifies quest is complete
+    before awarding XP/coins — frontend cannot fake quest completion.
+    """
+    result = await db.execute(
+        select(UserQuest, Quest)
+        .join(Quest, Quest.id == UserQuest.quest_id)
+        .where(
+            UserQuest.id == quest_id,
+            UserQuest.user_id == current_user.id,
+        )
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quest not found")
+
+    user_quest, quest = row.UserQuest, row.Quest
+
+    if not user_quest.completed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Quest not yet completed",
+        )
+
+    # Prevent double-claiming: check if XPHistory already has a quest_complete entry
+    # for this specific user_quest (use description matching quest title)
+    already_claimed_r = await db.execute(
+        select(XPHistory).where(
+            XPHistory.user_id == current_user.id,
+            XPHistory.source == "quest_claim",
+            XPHistory.description == f"Quest claimed: {quest.title}",
+        )
+    )
+    if already_claimed_r.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Quest reward already claimed",
+        )
+
+    user = await db.merge(current_user)
+    await award_xp(db, user, quest.xp_reward, "quest_claim", f"Quest claimed: {quest.title}")
+    await award_coins(db, user, quest.coin_reward, "quest_claim", f"Quest claimed: {quest.title}")
+
+    return QuestClaimResponse(
+        success=True,
+        xp=quest.xp_reward,
+        coins=quest.coin_reward,
+        message=f"Claimed {quest.xp_reward} XP and {quest.coin_reward} coins!",
+    )
+
+
+# ── Rewards ───────────────────────────────────────────────────────────────────
+
+@router.get("/rewards", response_model=list[RewardResponse])
+async def get_rewards(db: DBSession):
+    result = await db.execute(
+        select(Reward).where(Reward.is_active == True)  # noqa: E712
+    )
+    return result.scalars().all()
+
+
+# ── Leaderboard ───────────────────────────────────────────────────────────────
+
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     current_user: CurrentUser,
     db: DBSession,
-    period_type: str = Query("weekly", enum=["weekly", "global", "university"]),
+    scope: str = Query("weekly", enum=["weekly", "university", "department", "global"]),
+    period_type: Optional[str] = Query(None),  # backward-compat alias
 ):
-    from datetime import datetime
-    period_key = datetime.now().strftime("%Y-W%W") if period_type == "weekly" else "all"
+    """
+    Leaderboard endpoint.
+    Frontend uses ?scope=weekly|university|department
+    Legacy: ?period_type=weekly|global|university
+    """
+    # Resolve scope from either param
+    effective_scope = scope
+    if period_type:
+        effective_scope = period_type
+
+    period_key = datetime.now().strftime("%Y-W%W") if effective_scope == "weekly" else "all"
 
     q = select(User).order_by(User.xp.desc()).limit(50)
-    if period_type == "university" and current_user.university:
+
+    if effective_scope == "university" and current_user.university:
         q = q.where(User.university == current_user.university)
+    elif effective_scope == "department" and current_user.department:
+        q = q.where(
+            User.university == current_user.university,
+            User.department == current_user.department,
+        )
 
     result = await db.execute(q)
     users = result.scalars().all()
@@ -184,12 +321,14 @@ async def get_leaderboard(
     )
 
     return LeaderboardResponse(
-        period_type=period_type,
+        period_type=effective_scope,
         period_key=period_key,
         entries=entries,
         my_rank=my_rank,
     )
 
+
+# ── Streak ────────────────────────────────────────────────────────────────────
 
 @router.get("/streak", response_model=StreakResponse)
 async def get_streak(current_user: CurrentUser, db: DBSession):

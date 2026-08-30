@@ -15,6 +15,7 @@ from app.models.quiz import QuizAttempt, Quiz
 from app.models.revision import RevisionTopic
 from app.schemas.analytics import (
     AnalyticsOverview,
+    MLPredictionResponse,
     ProgressPoint,
     SubjectPerformance,
     StudyTimeBreakdown,
@@ -178,3 +179,73 @@ async def get_study_time(current_user: CurrentUser, db: DBSession):
         StudyTimeBreakdown(date=str(row.date), minutes=int((row.total_seconds or 0)) // 60)
         for row in result.all()
     ]
+
+
+@router.get("/ml-prediction", response_model=MLPredictionResponse)
+async def get_ml_prediction(current_user: CurrentUser, db: DBSession):
+    """
+    ML performance prediction endpoint.
+    Frontend analyticsApi.getMLPrediction() calls GET /analytics/ml-prediction.
+    Also aliased at GET /analytics/performance.
+    """
+    from datetime import datetime, timezone
+    from app.ml.feature_engineering import extract_features
+    from app.ml.performance_model import predict_performance
+
+    features = await extract_features(db, current_user.id)
+    label = predict_performance(features)
+
+    if label == "insufficient_data":
+        return MLPredictionResponse(
+            prediction="insufficient_data",
+            timestamp=datetime.now(tz=timezone.utc),
+            message="Not enough activity data yet. Complete more quizzes and lessons to get a prediction.",
+            key_factors=[],
+        )
+
+    # Build human-readable key factors
+    key_factors = []
+    if features.get("quiz_accuracy", 0) < 0.5:
+        key_factors.append("Low quiz accuracy — focus on reviewing weak topics")
+    elif features.get("quiz_accuracy", 0) >= 0.8:
+        key_factors.append("Strong quiz performance")
+
+    if features.get("streak_days", 0) >= 7:
+        key_factors.append(f"Excellent consistency — {features['streak_days']}-day streak")
+    elif features.get("streak_days", 0) == 0:
+        key_factors.append("No active streak — daily study habit needed")
+
+    if features.get("lesson_completion_rate", 0) < 0.4:
+        key_factors.append("Low lesson completion rate — complete more lessons")
+    elif features.get("lesson_completion_rate", 0) >= 0.7:
+        key_factors.append("High lesson completion rate")
+
+    if features.get("consistency_score", 0) < 0.3:
+        key_factors.append("Inconsistent study schedule over the past 2 weeks")
+    elif features.get("consistency_score", 0) >= 0.7:
+        key_factors.append("Very consistent study schedule")
+
+    if features.get("recent_performance_trend", 0) > 0.1:
+        key_factors.append("Improving performance trend")
+    elif features.get("recent_performance_trend", 0) < -0.1:
+        key_factors.append("Declining performance trend — review recent mistakes")
+
+    # Confidence: simple heuristic based on data quantity
+    data_points = features.get("_data_points", 0)
+    confidence = min(0.95, 0.5 + (data_points / 50) * 0.45)
+
+    clean_features = {k: v for k, v in features.items() if not k.startswith("_")}
+
+    return MLPredictionResponse(
+        prediction=label,
+        confidence=round(confidence, 2),
+        key_factors=key_factors[:4],
+        timestamp=datetime.now(tz=timezone.utc),
+        features_used=clean_features,
+    )
+
+
+@router.get("/performance", response_model=MLPredictionResponse)
+async def get_performance_prediction(current_user: CurrentUser, db: DBSession):
+    """Alias: GET /analytics/performance → same as /analytics/ml-prediction."""
+    return await get_ml_prediction(current_user, db)

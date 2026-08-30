@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
-from app.models.quiz import Question, Quiz, QuizAttempt
+from app.models.quiz import Quiz, QuizAttempt
 from app.models.user import User
 from app.schemas.quiz import AttemptResultResponse, QuizAttemptRequest
 from app.services import gamification_service as gs
@@ -93,12 +93,11 @@ async def submit_quiz_attempt(
     await gs.award_coins(db, user, coins, "quiz_complete", f"Quiz: {quiz.title}")
 
     # Advance quests
+    from app.models.gamification import Quest as QuestModel
     completed_quests = await gs.advance_quests(db, user.id, "quiz_complete")
     for uq in completed_quests:
         quest_result = await db.execute(
-            select(__import__('app.models.gamification', fromlist=['Quest']).Quest).where(
-                __import__('app.models.gamification', fromlist=['Quest']).Quest.id == uq.quest_id
-            )
+            select(QuestModel).where(QuestModel.id == uq.quest_id)
         )
         quest = quest_result.scalar_one_or_none()
         if quest:

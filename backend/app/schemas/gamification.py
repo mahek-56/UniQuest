@@ -66,6 +66,7 @@ class QuestResponse(BaseModel):
     coin_reward: int
     progress: int
     completed: bool
+    claimed: bool = False
     assigned_date: date
     completed_at: Optional[datetime] = None
 
@@ -112,3 +113,22 @@ class StreakResponse(BaseModel):
     current_streak: int
     longest_streak: int
     last_active_date: Optional[date] = None
+
+
+class GamificationStatsResponse(BaseModel):
+    """Combined stats for frontend gamificationApi.getStats()."""
+    xp: int
+    coins: int
+    streak: int
+    level: int
+    level_title: str = "Beginner"
+    rank: int
+    xp_to_next_level: int = 0
+
+
+class QuestClaimResponse(BaseModel):
+    """Response for POST /gamification/quests/{id}/claim."""
+    success: bool
+    xp: int
+    coins: int
+    message: str

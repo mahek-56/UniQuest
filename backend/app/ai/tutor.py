@@ -3,7 +3,7 @@ AI Tutor feature — answer student questions using Gemini.
 """
 
 import json
-from typing import Optional
+from datetime import datetime, timezone
 
 from app.ai import gemini_client
 from app.ai.prompts import TUTOR_SYSTEM, TUTOR_USER
@@ -14,10 +14,29 @@ logger = get_logger(__name__)
 
 
 async def ask_tutor(payload: TutorRequest) -> TutorResponse:
+    question = payload.effective_question
+    if not question:
+        return TutorResponse(
+            reply="Please provide a question.",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            suggestedFollowUps=[],
+        )
+
+    # Build conversation context from history if provided
+    history_context = ""
+    if payload.history:
+        history_lines = []
+        for msg in payload.history[-5:]:  # last 5 messages for context
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            history_lines.append(f"{role.upper()}: {content}")
+        if history_lines:
+            history_context = "\n".join(history_lines) + "\n\n"
+
     prompt = TUTOR_USER.format(
-        subject=payload.subject or "General",
-        context=payload.context or "No additional context provided.",
-        question=payload.question,
+        subject=payload.subject or "General Computer Science",
+        context=history_context + (payload.context or "No additional context provided."),
+        question=question,
     )
 
     try:
@@ -30,13 +49,18 @@ async def ask_tutor(payload: TutorRequest) -> TutorResponse:
     except Exception as exc:
         logger.error("Tutor AI call failed", error=str(exc))
         return TutorResponse(
-            answer="I'm unable to answer that right now. Please try again later.",
+            reply="I'm unable to answer that right now. Please try again later.",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            suggestedFollowUps=[
+                "Can you rephrase your question?",
+                "Try asking about a specific concept.",
+            ],
         )
 
     # Split answer from follow-up suggestions
     if "---SUGGESTIONS---" in raw:
         parts = raw.split("---SUGGESTIONS---", 1)
-        answer = parts[0].strip()
+        answer_text = parts[0].strip()
         suggestions_raw = parts[1].strip()
         try:
             suggestions = json.loads(suggestions_raw)
@@ -45,7 +69,13 @@ async def ask_tutor(payload: TutorRequest) -> TutorResponse:
         except Exception:
             suggestions = []
     else:
-        answer = raw.strip()
+        answer_text = raw.strip()
         suggestions = []
 
-    return TutorResponse(answer=answer, follow_up_suggestions=suggestions[:3])
+    return TutorResponse(
+        reply=answer_text,
+        answer=answer_text,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        suggestedFollowUps=suggestions[:3],
+        follow_up_suggestions=suggestions[:3],
+    )

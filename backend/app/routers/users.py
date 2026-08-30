@@ -1,8 +1,8 @@
 """
 User profile and stats endpoints: /api/v1/users
+Supports both /users/me (legacy) and /users/profile (frontend contract).
 """
 
-from typing import Optional
 
 from fastapi import APIRouter
 from sqlalchemy import func, select
@@ -11,10 +11,81 @@ from app.core.dependencies import CurrentUser, DBSession
 from app.models.gamification import Streak, XPHistory
 from app.models.progress import StudySession, UserProgress
 from app.models.quiz import QuizAttempt
-from app.schemas.user import ActivityItem, UpdateProfileRequest, UserResponse, UserStatsResponse
+from app.schemas.user import (
+    ActivityItem,
+    OnboardingRequest,
+    UpdateProfileRequest,
+    UserResponse,
+    UserStatsResponse,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+
+# ── Profile (frontend uses /users/profile) ────────────────────────────────────
+
+@router.get("/profile", response_model=UserResponse)
+async def get_profile_alias(current_user: CurrentUser):
+    """Frontend-compatible alias for GET /users/me"""
+    return current_user
+
+
+@router.patch("/profile", response_model=UserResponse)
+async def update_profile_alias(
+    payload: UpdateProfileRequest, current_user: CurrentUser, db: DBSession
+):
+    """Frontend-compatible PATCH /users/profile"""
+    user = await db.merge(current_user)
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(user, field, value)
+    await db.flush()
+    return user
+
+
+@router.post("/onboarding", response_model=UserResponse)
+async def complete_onboarding(
+    payload: OnboardingRequest, current_user: CurrentUser, db: DBSession
+):
+    """
+    Complete onboarding flow. Persists all onboarding data and marks
+    onboarding_completed = True. Awards 50 XP if this is first completion.
+    """
+    user = await db.merge(current_user)
+
+    already_done = user.onboarding_completed
+
+    # Persist all onboarding fields
+    if payload.name is not None:
+        user.full_name = payload.name
+    if payload.avatar is not None:
+        user.avatar_url = payload.avatar
+    if payload.university is not None:
+        user.university = payload.university
+    if payload.department is not None:
+        user.department = payload.department
+    if payload.semester is not None:
+        user.semester = payload.semester
+    if payload.interests is not None:
+        user.interests = payload.interests
+    if payload.dailyStudyTargetMinutes is not None:
+        user.daily_study_target_minutes = payload.dailyStudyTargetMinutes
+    if payload.targetGrade is not None:
+        user.target_grade = payload.targetGrade
+    if payload.preferredStudyTime is not None:
+        user.preferred_study_time = payload.preferredStudyTime
+
+    user.onboarding_completed = True
+
+    # Award one-time XP for completing onboarding
+    if not already_done:
+        from app.services.gamification_service import award_xp
+        await award_xp(db, user, 50, "onboarding_complete", "Onboarding completed")
+
+    await db.flush()
+    return user
+
+
+# ── Legacy /me routes (kept for backward compat) ─────────────────────────────
 
 @router.get("/me", response_model=UserResponse)
 async def get_profile(current_user: CurrentUser):
@@ -22,11 +93,17 @@ async def get_profile(current_user: CurrentUser):
 
 
 @router.put("/me", response_model=UserResponse)
-async def update_profile(payload: UpdateProfileRequest, current_user: CurrentUser, db: DBSession):
+async def update_profile(
+    payload: UpdateProfileRequest, current_user: CurrentUser, db: DBSession
+):
+    user = await db.merge(current_user)
     for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(current_user, field, value)
-    return current_user
+        setattr(user, field, value)
+    await db.flush()
+    return user
 
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
 
 @router.get("/me/stats", response_model=UserStatsResponse)
 async def get_stats(current_user: CurrentUser, db: DBSession):

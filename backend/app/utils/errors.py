@@ -23,12 +23,19 @@ async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    # Convert errors to JSON-serializable format (ctx may contain Exception objects)
+    errors = []
+    for error in exc.errors():
+        err = dict(error)
+        if "ctx" in err and isinstance(err["ctx"], dict):
+            err["ctx"] = {
+                k: str(v) if isinstance(v, Exception) else v
+                for k, v in err["ctx"].items()
+            }
+        errors.append(err)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "detail": "Validation error",
-            "errors": exc.errors(),
-        },
+        content={"detail": "Validation error", "errors": errors},
     )
 
 

@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import AdminUser, CurrentUser, DBSession
@@ -63,7 +63,7 @@ async def list_quizzes(
     items = []
     for quiz in quizzes:
         count_r = await db.execute(
-            select(__import__('sqlalchemy', fromlist=['func']).func.count(Question.id))
+            select(func.count(Question.id))
             .where(Question.quiz_id == quiz.id)
         )
         items.append(QuizResponse(
@@ -131,6 +131,18 @@ async def attempt_quiz(
     current_user: CurrentUser,
     db: DBSession,
 ):
+    return await submit_quiz_attempt(db, current_user, quiz_id, payload)
+
+
+# Frontend-compatible alias: POST /quizzes/{quiz_id}/submit
+@router.post("/{quiz_id}/submit", response_model=AttemptResultResponse)
+async def submit_quiz(
+    quiz_id: UUID,
+    payload: QuizAttemptRequest,
+    current_user: CurrentUser,
+    db: DBSession,
+):
+    """Alias for /attempt — matches frontend quizApi.submitQuiz contract."""
     return await submit_quiz_attempt(db, current_user, quiz_id, payload)
 
 

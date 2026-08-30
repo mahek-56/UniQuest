@@ -4,13 +4,23 @@ UniQuest Backend – FastAPI application entry point.
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
+from app.routers.ai_router import router as ai_router
+from app.routers.analytics import router as analytics_router
+from app.routers.auth import router as auth_router
+from app.routers.courses import courses_router, lessons_router, modules_router
+from app.routers.gamification import router as gamification_router
+from app.routers.notifications import router as notifications_router
+from app.routers.progress import router as progress_router
+from app.routers.quizzes import router as quizzes_router
+from app.routers.revision import router as revision_router
+from app.routers.study_planner import router as study_planner_router
+from app.routers.users import router as users_router
 from app.utils.errors import http_exception_handler, validation_exception_handler
 
 setup_logging()
@@ -56,22 +66,9 @@ app.add_middleware(
 # ── Exception handlers ────────────────────────────────────────────────────────
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
-
-from fastapi import HTTPException
 app.add_exception_handler(HTTPException, http_exception_handler)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-
-from app.routers.auth import router as auth_router
-from app.routers.users import router as users_router
-from app.routers.courses import courses_router, modules_router, lessons_router
-from app.routers.quizzes import router as quizzes_router
-from app.routers.progress import router as progress_router
-from app.routers.gamification import router as gamification_router
-from app.routers.analytics import router as analytics_router
-from app.routers.ai_router import router as ai_router
-from app.routers.revision import router as revision_router
-from app.routers.study_planner import router as study_planner_router
 
 API_PREFIX = "/api/v1"
 
@@ -87,6 +84,7 @@ app.include_router(analytics_router, prefix=API_PREFIX)
 app.include_router(ai_router, prefix=API_PREFIX)
 app.include_router(revision_router, prefix=API_PREFIX)
 app.include_router(study_planner_router, prefix=API_PREFIX)
+app.include_router(notifications_router, prefix=API_PREFIX)
 
 
 @app.get("/health", tags=["health"])
