@@ -62,10 +62,10 @@ export const Sidebar = () => {
       {user && (
         <div className="bg-white border-2 border-brand-dark rounded-2xl p-3 shadow-brutal-sm mb-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl border border-brand-dark bg-cream-200 overflow-hidden shrink-0">
-            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+            <img src={user.avatar || user.avatar_url} alt={user.name || user.full_name} className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="font-black text-xs truncate text-brand-dark">{user.name}</h4>
+            <h4 className="font-black text-xs truncate text-brand-dark">{user.name || user.full_name}</h4>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[10px] font-black text-brand-blue">
                 Lvl {levelData?.level} {levelData?.title}

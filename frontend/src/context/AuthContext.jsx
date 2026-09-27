@@ -89,8 +89,20 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = async (updates) => {
-    const updated = await userApi.updateProfile(updates);
+    const payload = {
+      ...updates,
+      full_name: updates.full_name || updates.name,
+      name: updates.name || updates.full_name,
+      avatar_url: updates.avatar_url || updates.avatar,
+      avatar: updates.avatar || updates.avatar_url,
+      daily_study_target_minutes: updates.daily_study_target_minutes || updates.dailyStudyTargetMinutes,
+      dailyStudyTargetMinutes: updates.dailyStudyTargetMinutes || updates.daily_study_target_minutes,
+      preferred_study_time: updates.preferred_study_time || updates.preferredStudyTime,
+      preferredStudyTime: updates.preferredStudyTime || updates.preferred_study_time,
+    };
+    const updated = await userApi.updateProfile(payload);
     setUser(updated);
+    storage.set('user_profile', updated);
     return updated;
   };
 

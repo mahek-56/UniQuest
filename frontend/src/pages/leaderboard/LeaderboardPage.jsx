@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Crown, Globe, School, Building2, Flame } from 'lucide-react';
+import { Trophy, Crown, Globe, School, Building2, Flame, Users, Sparkles } from 'lucide-react';
 import { gamificationApi } from '../../services/gamificationApi';
 import { LeaderboardPodium, LeaderboardRow } from '../../components/gamification/LeaderboardPodium';
+import { UserComparisonModal } from '../../components/analytics/UserComparisonModal';
+import { Button } from '../../components/common/Button';
 
 export const LeaderboardPage = () => {
   const [scope, setScope] = useState('weekly'); // 'weekly' | 'university' | 'department'
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [comparisonModalOpen, setComparisonModalOpen] = useState(false);
+  const [targetUserId, setTargetUserId] = useState(null);
 
   useEffect(() => {
     const loadLeaderboard = async () => {
@@ -26,7 +30,11 @@ export const LeaderboardPage = () => {
 
   const safeEntries = Array.isArray(entries) ? entries : [];
   const topThree = safeEntries.slice(0, 3);
-  const remaining = safeEntries.slice(3);
+
+  const handleOpenComparison = (userId = null) => {
+    setTargetUserId(userId);
+    setComparisonModalOpen(true);
+  };
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8 max-w-5xl mx-auto">
@@ -39,8 +47,21 @@ export const LeaderboardPage = () => {
           Campus & Global Leaderboards
         </h1>
         <p className="text-xs sm:text-sm font-medium text-brand-dark/70 mt-1 max-w-lg">
-          Compete against classmates, university peers, and students worldwide. Top 3 scholars earn weekly trophy rewards!
+          Compete against classmates, university peers, and students worldwide. Top scholars earn prestigious leaderboard recognition!
         </p>
+
+        {/* Peer Comparison CTA */}
+        <div className="mt-4">
+          <Button
+            variant="pink"
+            size="sm"
+            onClick={() => handleOpenComparison()}
+            icon={Users}
+            className="font-black"
+          >
+            Compare Stats with Classmate 👥
+          </Button>
+        </div>
 
         {/* Scope Selector Tabs */}
         <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
@@ -88,6 +109,13 @@ export const LeaderboardPage = () => {
           <LeaderboardRow key={entry.rank || entry.user_id || idx} entry={entry} />
         ))}
       </div>
+
+      {/* Peer Comparison Modal */}
+      <UserComparisonModal
+        isOpen={comparisonModalOpen}
+        onClose={() => setComparisonModalOpen(false)}
+        initialTargetUserId={targetUserId}
+      />
     </div>
   );
 };

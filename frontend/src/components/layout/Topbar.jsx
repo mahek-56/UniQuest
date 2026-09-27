@@ -83,7 +83,7 @@ export const Topbar = ({ onToggleMobileMenu }) => {
           className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border-2 border-brand-dark bg-brand-gold overflow-hidden cursor-pointer shadow-brutal-sm hover:scale-105 transition-transform shrink-0"
           title="My Profile"
         >
-          <img src={user?.avatar} alt={user?.name || "User"} className="w-full h-full object-cover" />
+          <img src={user?.avatar || user?.avatar_url} alt={user?.name || user?.full_name || "User"} className="w-full h-full object-cover" />
         </div>
       </div>
     </header>

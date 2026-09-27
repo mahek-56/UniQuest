@@ -17,21 +17,35 @@ export const CoursesListPage = () => {
   useEffect(() => {
     const loadCourses = async () => {
       const data = await courseApi.getCourses();
-      setCourses(data);
+      setCourses(Array.isArray(data) ? data : []);
     };
     loadCourses();
   }, []);
 
   const categories = ['All', 'Computer Science', 'Artificial Intelligence', 'Algorithms'];
 
-  const filteredCourses = courses.filter((c) => {
-    const matchesSearch =
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase()) ||
-      c.description.toLowerCase().includes(search.toLowerCase());
+  const filteredCourses = (courses || []).filter((c) => {
+    if (!c) return false;
+    const title = (c.title || '').toLowerCase();
+    const code = (c.code || '').toLowerCase();
+    const desc = (c.description || '').toLowerCase();
+    const subject = (c.subject || '').toLowerCase();
+    const query = search.toLowerCase();
 
-    const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
-    const matchesDifficulty = selectedDifficulty === 'All' || c.difficulty === selectedDifficulty;
+    const matchesSearch =
+      title.includes(query) ||
+      code.includes(query) ||
+      desc.includes(query) ||
+      subject.includes(query);
+
+    const matchesCategory =
+      selectedCategory === 'All' ||
+      c.category === selectedCategory ||
+      c.subject === selectedCategory;
+
+    const matchesDifficulty =
+      selectedDifficulty === 'All' ||
+      (c.difficulty || '').toLowerCase() === selectedDifficulty.toLowerCase();
 
     return matchesSearch && matchesCategory && matchesDifficulty;
   });
@@ -79,7 +93,7 @@ export const CoursesListPage = () => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search subjects..."
+            placeholder="Search subjects or courses..."
             className="w-full bg-cream-50 text-brand-dark text-xs font-medium border-2 border-brand-dark rounded-xl pl-10 pr-4 py-2 shadow-brutal-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
           />
         </div>

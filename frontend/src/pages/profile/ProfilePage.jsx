@@ -19,11 +19,11 @@ export const ProfilePage = () => {
       <div className="bg-white border-3 border-brand-dark rounded-3xl p-6 sm:p-8 shadow-brutal-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-3 border-brand-dark bg-brand-gold overflow-hidden shadow-brutal shrink-0 glow-gold">
-            <img src={user?.avatar} alt={user?.name} className="w-full h-full object-cover" />
+            <img src={user?.avatar || user?.avatar_url} alt={user?.name || user?.full_name} className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-black text-brand-dark">{user?.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-brand-dark">{user?.name || user?.full_name}</h1>
               <span className="bg-brand-blue text-white text-xs font-black px-3 py-0.5 rounded-full uppercase tracking-wider">
                 {levelData?.title}
               </span>
