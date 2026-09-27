@@ -1,5 +1,16 @@
 import React from 'react';
-import { Brain, ShieldAlert, Sparkles, TrendingUp, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Brain,
+  ShieldAlert,
+  Sparkles,
+  TrendingUp,
+  CheckCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ListOrdered,
+  Layers,
+  ArrowRight
+} from 'lucide-react';
 import { ProgressBar } from '../common/ProgressBar';
 
 export const MLPredictionBadge = ({ prediction }) => {
@@ -9,24 +20,50 @@ export const MLPredictionBadge = ({ prediction }) => {
 
   if (isInsufficient) {
     return (
-      <div className="bg-white border-3 border-brand-dark rounded-3xl p-6 sm:p-7 shadow-brutal flex flex-col gap-4">
-        <div className="flex items-center gap-3.5 pb-4 border-b-2 border-cream-200">
-          <div className="w-12 h-12 rounded-2xl bg-brand-dark text-brand-gold border-2 border-brand-dark flex items-center justify-center text-2xl shadow-brutal-sm">
-            <Brain className="w-6 h-6" />
+      <div className="bg-white border-3 border-brand-dark rounded-3xl p-6 sm:p-8 shadow-brutal flex flex-col gap-6">
+        <div className="flex items-center justify-between gap-3.5 pb-4 border-b-2 border-cream-200">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-brand-dark text-brand-gold border-2 border-brand-dark flex items-center justify-center text-2xl shadow-brutal-sm">
+              <Brain className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-black text-xl text-brand-dark">ML Exam Performance Predictor</h3>
+              <p className="text-xs font-semibold text-brand-dark/60 mt-0.5">
+                Random Forest ML Classification Engine (7 Telemetry Features)
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-black text-xl text-brand-dark">ML Exam Performance Predictor</h3>
-            <p className="text-xs font-semibold text-brand-dark/60 mt-0.5">
-              Random Forest ML Classification Model
-            </p>
-          </div>
+          <span className="text-xs font-black uppercase bg-amber-100 text-amber-900 border border-amber-500 px-3 py-1 rounded-full">
+            Insufficient Telemetry
+          </span>
         </div>
-        <div className="p-5 bg-amber-50 border-2 border-brand-gold rounded-2xl text-center">
-          <span className="text-3xl mb-2 block">📊</span>
-          <h4 className="font-black text-sm text-brand-dark">Insufficient Data for Performance Prediction</h4>
-          <p className="text-xs font-semibold text-brand-dark/70 mt-1 max-w-md mx-auto text-center">
-            {prediction.message || "Complete more quizzes, lessons, and spaced revisions to unlock machine learning grade predictions."}
+
+        <div className="p-6 bg-cream-50 border-2 border-dashed border-brand-dark/40 rounded-2xl flex flex-col gap-4 text-center items-center">
+          <span className="text-4xl block">📊</span>
+          <h4 className="font-black text-base text-brand-dark">More Learning Activity Needed</h4>
+          <p className="text-xs font-medium text-brand-dark/75 max-w-lg">
+            {prediction.message || "We need more learning activity and quiz data to generate a reliable machine learning prediction."}
           </p>
+
+          <div className="w-full max-w-md bg-white border-2 border-brand-dark rounded-xl p-4 text-left shadow-brutal-sm">
+            <span className="block text-[11px] font-black uppercase text-brand-dark mb-2">
+              Action Items to Unlock Prediction:
+            </span>
+            <ul className="text-xs font-bold text-brand-dark/80 flex flex-col gap-1.5">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-brand-blue shrink-0" />
+                <span>Complete at least 5 checkpoint quizzes</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                <span>Finish at least 3 course curriculum lessons</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-brand-pink shrink-0" />
+                <span>Maintain an active study session streak</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     );
@@ -38,17 +75,20 @@ export const MLPredictionBadge = ({ prediction }) => {
      prediction.prediction === 'average' ? 'Average' : 
      prediction.prediction === 'at_risk' ? 'At_Risk' : prediction.prediction);
 
-  const confidence = prediction.confidence || 0.85;
+  const confidence = prediction.confidence !== undefined ? prediction.confidence : 0.85;
+  const confidencePercent = Math.round(confidence * 100);
+
   const classProbabilities = prediction.classProbabilities || {
     Strong: predictedCategory === 'Strong' ? confidence : (1 - confidence) / 2,
     Average: predictedCategory === 'Average' ? confidence : (1 - confidence) / 2,
     At_Risk: predictedCategory === 'At_Risk' ? confidence : (1 - confidence) / 2,
   };
+
   const predictedSemesterGrade = prediction.predictedSemesterGrade || 
     (predictedCategory === 'Strong' ? 'A / A+' : predictedCategory === 'Average' ? 'B / B+' : 'C / D');
 
   const summary = prediction.summary || prediction.message || 
-    `You are currently predicted to perform at a ${predictedCategory} level based on your active study telemetry.`;
+    `You are currently predicted to perform at a ${predictedCategory} level based on your active study telemetry, quiz scores, and spaced recall cadence.`;
 
   const backendFactors = prediction.key_factors || prediction.keyFactors || [];
   const factors = prediction.factors || (backendFactors.length > 0 ? backendFactors.map(f => ({
@@ -64,20 +104,23 @@ export const MLPredictionBadge = ({ prediction }) => {
     Strong: {
       bg: 'bg-emerald-50 border-emerald-500 text-emerald-950',
       badgeBg: 'bg-brand-green text-brand-dark',
-      icon: '🚀',
+      icon: '🟢',
       headline: 'High Academic Momentum (Top Tier)',
+      riskLevel: 'Low Risk',
     },
     Average: {
       bg: 'bg-amber-50 border-amber-500 text-amber-950',
       badgeBg: 'bg-brand-gold text-brand-dark',
-      icon: '⚖️',
+      icon: '🟡',
       headline: 'Steady Pace • Improvement Opportunities Available',
+      riskLevel: 'Moderate Risk',
     },
     At_Risk: {
       bg: 'bg-rose-50 border-rose-500 text-rose-950',
       badgeBg: 'bg-brand-red text-white',
-      icon: '⚠️',
+      icon: '🔴',
       headline: 'Intervention Recommended (At Risk)',
+      riskLevel: 'High Risk',
     },
   };
 
@@ -99,19 +142,19 @@ export const MLPredictionBadge = ({ prediction }) => {
               </span>
             </div>
             <p className="text-xs font-semibold text-brand-dark/60 mt-0.5">
-              Trained on student study telemetry, quiz accuracy, and revision cadence
+              Confidence: <span className="text-brand-blue font-black">{confidencePercent}%</span> • Risk: <span className="font-black">{current.riskLevel}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <span className="text-[11px] font-bold text-brand-dark/60 uppercase">Predicted Grade</span>
+            <span className="text-[11px] font-bold text-brand-dark/60 uppercase">Target Grade</span>
             <div className="text-2xl font-black text-brand-blue">{predictedSemesterGrade}</div>
           </div>
           <div className={`px-4 py-2 rounded-2xl border-2 border-brand-dark font-black text-sm shadow-brutal-sm flex items-center gap-1.5 ${current.badgeBg}`}>
             <span>{current.icon}</span>
-            <span>{predictedCategory}</span>
+            <span>{predictedCategory} Performance</span>
           </div>
         </div>
       </div>
@@ -121,25 +164,25 @@ export const MLPredictionBadge = ({ prediction }) => {
         <div className="p-3.5 rounded-2xl border-2 border-brand-dark bg-emerald-50 flex flex-col gap-1 shadow-brutal-sm">
           <div className="flex justify-between text-xs font-black text-emerald-900">
             <span>Strong Probability</span>
-            <span>{Math.round((classProbabilities?.Strong || 0.88) * 100)}%</span>
+            <span>{Math.round((classProbabilities?.Strong || 0.85) * 100)}%</span>
           </div>
-          <ProgressBar progress={(classProbabilities?.Strong || 0.88) * 100} color="green" height="sm" />
+          <ProgressBar progress={(classProbabilities?.Strong || 0.85) * 100} color="green" height="sm" />
         </div>
 
         <div className="p-3.5 rounded-2xl border-2 border-brand-dark bg-amber-50 flex flex-col gap-1 shadow-brutal-sm">
           <div className="flex justify-between text-xs font-black text-amber-900">
             <span>Average Probability</span>
-            <span>{Math.round((classProbabilities?.Average || 0.09) * 100)}%</span>
+            <span>{Math.round((classProbabilities?.Average || 0.10) * 100)}%</span>
           </div>
-          <ProgressBar progress={(classProbabilities?.Average || 0.09) * 100} color="gold" height="sm" />
+          <ProgressBar progress={(classProbabilities?.Average || 0.10) * 100} color="gold" height="sm" />
         </div>
 
         <div className="p-3.5 rounded-2xl border-2 border-brand-dark bg-rose-50 flex flex-col gap-1 shadow-brutal-sm">
           <div className="flex justify-between text-xs font-black text-rose-900">
             <span>At-Risk Probability</span>
-            <span>{Math.round((classProbabilities?.At_Risk || 0.03) * 100)}%</span>
+            <span>{Math.round((classProbabilities?.At_Risk || 0.05) * 100)}%</span>
           </div>
-          <ProgressBar progress={(classProbabilities?.At_Risk || 0.03) * 100} color="pink" height="sm" />
+          <ProgressBar progress={(classProbabilities?.At_Risk || 0.05) * 100} color="pink" height="sm" />
         </div>
       </div>
 

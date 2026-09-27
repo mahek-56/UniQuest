@@ -1,27 +1,48 @@
 import { apiClient } from './api';
 import { storage } from '../utils/storage';
 
+export const normalizeUser = (user) => {
+  if (!user) return null;
+  const name = user.full_name || user.name || 'Scholar';
+  const avatar = user.avatar_url || user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}&backgroundColor=FFD400`;
+
+  return {
+    ...user,
+    name,
+    full_name: name,
+    avatar,
+    avatar_url: avatar,
+    department: user.department || 'Computer Engineering',
+    university: user.university || 'National Tech University',
+    dailyStudyTargetMinutes: user.daily_study_target_minutes || user.dailyStudyTargetMinutes || 45,
+    daily_study_target_minutes: user.daily_study_target_minutes || user.dailyStudyTargetMinutes || 45,
+    preferredStudyTime: user.preferred_study_time || user.preferredStudyTime || 'Evening (6 PM - 9 PM)',
+    preferred_study_time: user.preferred_study_time || user.preferredStudyTime || 'Evening (6 PM - 9 PM)',
+  };
+};
+
 export const authApi = {
   login: async (credentials) => {
-    // Always try real backend first
     const response = await apiClient.post('/auth/login', credentials);
+    const normalized = normalizeUser(response.data.user);
     storage.set('auth_token', response.data.access_token);
     storage.set('refresh_token', response.data.refresh_token);
-    storage.set('user_profile', response.data.user);
-    return response.data;
+    storage.set('user_profile', normalized);
+    return { ...response.data, user: normalized };
   },
 
   register: async (userData) => {
     const response = await apiClient.post('/auth/register', userData);
+    const normalized = normalizeUser(response.data.user);
     storage.set('auth_token', response.data.access_token);
     storage.set('refresh_token', response.data.refresh_token);
-    storage.set('user_profile', response.data.user);
-    return response.data;
+    storage.set('user_profile', normalized);
+    return { ...response.data, user: normalized };
   },
 
   getMe: async () => {
     const response = await apiClient.get('/auth/me');
-    return response.data;
+    return normalizeUser(response.data);
   },
 
   logout: async () => {
@@ -31,7 +52,7 @@ export const authApi = {
         await apiClient.post('/auth/logout', { refresh_token: refreshToken });
       }
     } catch (e) {
-      // Ignore logout errors — clear local state regardless
+      // Ignore logout errors
     } finally {
       storage.remove('auth_token');
       storage.remove('refresh_token');

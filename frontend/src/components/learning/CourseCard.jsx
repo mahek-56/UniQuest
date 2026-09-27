@@ -6,21 +6,20 @@ import { ProgressBar } from '../common/ProgressBar';
 
 export const CourseCard = ({ course }) => {
   const navigate = useNavigate();
+  if (!course) return null;
+
   const {
     id,
-    code,
-    title,
-    subtitle,
-    category,
-    department,
-    difficulty,
-    instructor,
-    thumbnail,
-    totalXP,
-    estimatedHours,
-    enrolledCount,
+    code = 'CS-101',
+    title = 'Course Title',
+    subtitle = '',
+    department = 'Computer Science',
+    difficulty = 'Intermediate',
+    thumbnail = 'https://images.unsplash.com/photo-1516116211227-bbc13c74a367?w=800',
+    totalXP = 400,
+    estimatedHours = 16,
+    enrolledCount = 120,
     progress = 0,
-    color = "#0055DA",
   } = course;
 
   return (
@@ -34,6 +33,9 @@ export const CourseCard = ({ course }) => {
           src={thumbnail}
           alt={title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            e.target.src = 'https://images.unsplash.com/photo-1516116211227-bbc13c74a367?w=800';
+          }}
         />
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           <span className="bg-brand-dark text-white text-[11px] font-black uppercase px-2.5 py-1 rounded-full border border-white/40 shadow-brutal-sm">
@@ -60,7 +62,7 @@ export const CourseCard = ({ course }) => {
             {title}
           </h3>
           <p className="text-xs font-medium text-brand-dark/70 mt-1 line-clamp-2">
-            {subtitle}
+            {subtitle || course.description || 'Master core concepts and syllabus objectives.'}
           </p>
         </div>
 
@@ -101,8 +103,20 @@ export const ModuleAccordion = ({ module, courseId, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
   const navigate = useNavigate();
 
-  const { id, title, description, duration, xp, lessons = [], quiz } = module;
-  const completedLessons = lessons.filter(l => l.completed).length;
+  if (!module) return null;
+
+  const {
+    id,
+    title = 'Curriculum Module',
+    description = '',
+    duration = '45 mins',
+    xp = 60,
+    lessons = [],
+    quiz,
+  } = module;
+
+  const validLessons = Array.isArray(lessons) ? lessons : [];
+  const completedLessons = validLessons.filter(l => l.completed).length;
 
   return (
     <div className="bg-white border-2 border-brand-dark rounded-2xl shadow-brutal-sm overflow-hidden mb-4">
@@ -113,19 +127,19 @@ export const ModuleAccordion = ({ module, courseId, defaultOpen = false }) => {
       >
         <div className="flex items-center gap-3.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-brand-gold border-2 border-brand-dark flex items-center justify-center font-black text-sm shrink-0">
-            {completedLessons === lessons.length ? "✓" : completedLessons}
+            {completedLessons === validLessons.length && validLessons.length > 0 ? "✓" : completedLessons}
           </div>
           <div className="min-w-0">
             <h4 className="font-black text-base text-brand-dark truncate">{title}</h4>
             <p className="text-xs font-medium text-brand-dark/60 line-clamp-1 mt-0.5">
-              {lessons.length} Lessons • {duration} • +{xp} XP
+              {validLessons.length} Lessons • {duration} • +{xp} XP
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-black px-2.5 py-1 bg-cream-100 rounded-full border border-brand-dark">
-            {completedLessons}/{lessons.length} Done
+            {completedLessons}/{validLessons.length} Done
           </span>
         </div>
       </div>
@@ -133,12 +147,14 @@ export const ModuleAccordion = ({ module, courseId, defaultOpen = false }) => {
       {/* Accordion Body */}
       {isOpen && (
         <div className="p-4 sm:p-5 pt-0 border-t border-cream-200 bg-cream-50/40 flex flex-col gap-2.5">
-          <p className="text-xs font-medium text-brand-dark/70 my-2">{description}</p>
+          {description && (
+            <p className="text-xs font-medium text-brand-dark/70 my-2">{description}</p>
+          )}
 
-          <div className="flex flex-col gap-2">
-            {lessons.map((l, index) => (
+          <div className="flex flex-col gap-2 mt-2">
+            {validLessons.map((l, index) => (
               <div
-                key={l.id}
+                key={l.id || index}
                 onClick={() => navigate(`/lessons/${l.id}`)}
                 className="flex items-center justify-between p-3 rounded-xl border border-brand-dark bg-white hover:bg-cream-100 cursor-pointer shadow-brutal-sm transition-all"
               >
@@ -157,7 +173,7 @@ export const ModuleAccordion = ({ module, courseId, defaultOpen = false }) => {
                 </div>
 
                 <span className="text-xs font-black text-brand-pink flex items-center gap-0.5">
-                  <Zap className="w-3 h-3 fill-brand-pink" /> +{l.xp} XP
+                  <Zap className="w-3 h-3 fill-brand-pink" /> +{l.xp || 20} XP
                 </span>
               </div>
             ))}
@@ -175,14 +191,14 @@ export const ModuleAccordion = ({ module, courseId, defaultOpen = false }) => {
                   <div>
                     <h5 className="font-black text-sm text-brand-dark">{quiz.title}</h5>
                     <span className="text-[11px] font-bold text-brand-dark/70">
-                      {quiz.questionsCount} Questions • Pass {quiz.passScore}%
+                      {quiz.questionsCount || 5} Questions • Pass {quiz.passScore || 60}%
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-brand-dark bg-brand-gold px-2.5 py-1 rounded-lg border border-brand-dark">
-                    +{quiz.xpReward} XP
+                    +{quiz.xpReward || 30} XP
                   </span>
                   <ChevronRight className="w-4 h-4 text-brand-dark" />
                 </div>
