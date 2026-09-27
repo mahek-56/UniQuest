@@ -197,7 +197,7 @@ async def get_quests(current_user: CurrentUser, db: DBSession):
             coin_reward=row.Quest.coin_reward,
             progress=row.UserQuest.progress,
             completed=row.UserQuest.completed,
-            claimed=row.UserQuest.claimed if hasattr(row.UserQuest, "claimed") else row.UserQuest.completed,
+            claimed=row.UserQuest.claimed,
             assigned_date=row.UserQuest.assigned_date,
             completed_at=row.UserQuest.completed_at,
         )
@@ -209,7 +209,7 @@ async def get_quests(current_user: CurrentUser, db: DBSession):
 async def claim_quest_reward(quest_id: UUID, current_user: CurrentUser, db: DBSession):
     """
     Claim rewards for a completed quest. Backend verifies quest is complete
-    before awarding XP/coins — frontend cannot fake quest completion.
+    and not yet claimed before awarding XP/coins — frontend cannot fake quest completion.
     """
     result = await db.execute(
         select(UserQuest, Quest)
@@ -231,24 +231,18 @@ async def claim_quest_reward(quest_id: UUID, current_user: CurrentUser, db: DBSe
             detail="Quest not yet completed",
         )
 
-    # Prevent double-claiming: check if XPHistory already has a quest_complete entry
-    # for this specific user_quest (use description matching quest title)
-    already_claimed_r = await db.execute(
-        select(XPHistory).where(
-            XPHistory.user_id == current_user.id,
-            XPHistory.source == "quest_claim",
-            XPHistory.description == f"Quest claimed: {quest.title}",
-        )
-    )
-    if already_claimed_r.scalar_one_or_none():
+    # Strictly reject duplicate claims using database flag and transaction
+    if user_quest.claimed:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Quest reward already claimed",
         )
 
+    user_quest.claimed = True
     user = await db.merge(current_user)
     await award_xp(db, user, quest.xp_reward, "quest_claim", f"Quest claimed: {quest.title}")
     await award_coins(db, user, quest.coin_reward, "quest_claim", f"Quest claimed: {quest.title}")
+    await db.flush()
 
     return QuestClaimResponse(
         success=True,
@@ -307,6 +301,9 @@ async def get_leaderboard(
             rank=idx + 1,
             user_id=u.id,
             full_name=u.full_name,
+            name=u.full_name,
+            avatar_url=u.avatar_url,
+            avatar=u.avatar_url,
             university=u.university,
             department=u.department,
             xp=u.xp,

@@ -83,15 +83,11 @@ async def get_current_plan(current_user: CurrentUser, db: DBSession):
 async def get_recommendations(current_user: CurrentUser, db: DBSession):
     """
     Return AI-generated personalized recommendations.
-    Uses real user data; falls back to graceful error if Gemini unavailable.
+    Uses real user data; falls back to telemetry heuristics if Gemini is offline.
     """
     cached = await recommendations.get_cached_recommendations(db, current_user.id)
     if cached:
         return cached
-
-    if not settings.GEMINI_API_KEY:
-        # Return empty list rather than 503 — frontend handles empty state gracefully
-        return []
 
     # Build a rich performance summary from real user data
     from sqlalchemy import func
@@ -131,7 +127,7 @@ async def get_recommendations(current_user: CurrentUser, db: DBSession):
         f"Interests: {current_user.interests or 'not specified'}."
     )
 
-    return await recommendations.get_recommendations(db, current_user.id, summary)
+    return await recommendations.get_recommendations(db, current_user, summary)
 
 
 # ── Wrong-answer explanation ──────────────────────────────────────────────────

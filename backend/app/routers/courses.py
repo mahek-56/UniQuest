@@ -89,8 +89,33 @@ async def get_course(course_id: UUID, db: DBSession):
     return data
 
 
+@courses_router.get("/{course_id}/resources")
+async def get_course_resources(course_id: UUID, db: DBSession):
+    result = await db.execute(select(Course).where(Course.id == course_id))
+    course = result.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    from app.data.course_resources import get_resources_for_subject
+    resources = get_resources_for_subject(course.subject or course.title)
+    return {
+        "course_id": course.id,
+        "course_title": course.title,
+        "subject": course.subject,
+        "resources": resources,
+    }
+
+
+@courses_router.get("/resources/search")
+async def search_resources(subject: Optional[str] = Query(None)):
+    from app.data.course_resources import get_resources_for_subject
+    return get_resources_for_subject(subject or "")
+
+
 @courses_router.put("/{course_id}", response_model=CourseResponse)
-async def update_course(course_id: UUID, payload: CourseUpdate, current_user: AdminUser, db: DBSession):
+async def update_course(
+    course_id: UUID, payload: CourseUpdate, current_user: AdminUser, db: DBSession
+):
     result = await db.execute(select(Course).where(Course.id == course_id))
     course = result.scalar_one_or_none()
     if not course:
