@@ -26,27 +26,38 @@ You are UniQuest Study Planner. Generate a realistic, structured study plan for 
 Output ONLY valid JSON matching the schema described by the user. No preamble, no markdown fences.
 """
 
-STUDY_PLAN_USER = """\
-Student information:
-- Subjects: {subjects}
-- Exam date: {exam_date}
+# MODE 1 — Custom Date Range Study Plan Prompt
+STUDY_PLAN_CUSTOM_RANGE_USER = """\
+Student information for Custom Date Range Timetable:
+- Start Date: {start_date}
+- End Date: {end_date}
+- Total Days: {num_days}
+- Subjects to study: {subjects}
 - Daily study hours available: {daily_hours}
 - Goals: {goals}
 
-Generate a weekly JSON study plan matching this exact structure:
+CRITICAL RULES:
+1. Generate study days specifically covering the date range from {start_date} to {end_date}.
+2. Distribute the subjects intelligently across each day in the date range.
+3. Every day item must have the exact calendar date (YYYY-MM-DD) and day name.
+4. Do NOT ask for or require an exam date.
+
+Generate a JSON study plan matching this exact structure:
 {{
-  "scheduleSummary": "Brief motivating overview of the weekly study strategy",
-  "weeklyGoalHours": {daily_hours} * 6,
+  "mode": "custom_range",
+  "scheduleSummary": "Comprehensive study schedule from {start_date} to {end_date}",
+  "weeklyGoalHours": {daily_hours} * {num_days},
   "days": [
     {{
-      "dayName": "Monday",
+      "date": "{start_date}",
+      "dayName": "Monday ({start_date})",
       "focusSubject": "Subject Name",
       "theme": "Focus theme for the day",
       "color": "#0055DA",
       "blocks": [
         {{
           "time": "6:00 PM - 7:30 PM",
-          "task": "Specific learning or problem solving task",
+          "task": "Deep dive and problem solving",
           "xp": 40
         }}
       ]
@@ -54,6 +65,51 @@ Generate a weekly JSON study plan matching this exact structure:
   ]
 }}
 """
+
+# MODE 2 — Exam Preparation Plan Prompt
+STUDY_PLAN_EXAM_PREP_USER = """\
+Student information for Exam Preparation Countdown:
+- Today's Date: {today} ({day_of_week})
+- Target Exam Date: {exam_date}
+- Days Remaining: {days_until_exam}
+- Exam Subjects: {subjects}
+- Daily study hours available: {daily_hours}
+- Preparation Level: {prep_level}
+- Target Grade: {target_grade}
+- Weak Topics Priority: {weak_topics}
+
+CRITICAL RULES:
+1. Generate a countdown study plan starting from today ({today}) leading up to {exam_date}.
+2. Allocate priority focus to weak topics ({weak_topics}) and core exam topics.
+3. Include active recall, formula review, and practice mock tests as the exam date approaches.
+4. NEVER generate study sessions for dates before {today}.
+
+Generate a JSON study plan matching this exact structure:
+{{
+  "mode": "exam_prep",
+  "scheduleSummary": "Exam countdown strategy for {exam_date} targeting grade {target_grade}",
+  "weeklyGoalHours": {daily_hours} * 6,
+  "days": [
+    {{
+      "date": "{today}",
+      "dayName": "{day_of_week} ({today})",
+      "focusSubject": "Subject Name",
+      "theme": "Exam prep focus theme",
+      "color": "#0055DA",
+      "blocks": [
+        {{
+          "time": "6:00 PM - 7:30 PM",
+          "task": "Exam topic mastery & active problem solving",
+          "xp": 40
+        }}
+      ]
+    }}
+  ]
+}}
+"""
+
+# Legacy fallback prompt template
+STUDY_PLAN_USER = STUDY_PLAN_EXAM_PREP_USER
 
 RECOMMENDATION_SYSTEM = """\
 You are UniQuest Recommendation Engine. Based on the student's performance data, suggest learning resources.
@@ -68,7 +124,7 @@ Suggest 3 personalized learning recommendations. Each should have:
 - type: "lesson" | "revision" | "practice"
 - title: short title
 - subject: subject name
-- reason: why this is recommended (1-2 sentences)
+- reason: why this is recommended based on their actual performance (1-2 sentences)
 
 Return a JSON array of recommendation objects.
 """

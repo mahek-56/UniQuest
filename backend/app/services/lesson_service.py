@@ -77,7 +77,7 @@ async def complete_lesson(
         )
     )
     progress = progress_result.scalar_one_or_none()
-    already_completed = progress and progress.is_completed
+    already_completed = bool(progress and progress.is_completed)
 
     if not progress:
         progress = UserProgress(user_id=user.id, lesson_id=lesson_id)
@@ -98,17 +98,8 @@ async def complete_lesson(
         if milestone:
             await gs.award_xp(db, user, gs.XP_VALUES["streak_7day"], "streak_7day")
 
-        # Advance quests
-        completed_quests = await gs.advance_quests(db, user.id, "lesson_complete")
-        for uq in completed_quests:
-            from sqlalchemy import select as _select
-            from app.models.gamification import Quest
-            qr = await db.execute(_select(Quest).where(Quest.id == uq.quest_id))
-            quest = qr.scalar_one_or_none()
-            if quest:
-                await gs.award_xp(db, user, quest.xp_reward, "quest_complete", quest.title)
-                await gs.award_coins(db, user, quest.coin_reward, "quest_complete", quest.title)
-
+        # Advance quests (user claims reward through quest headquarters)
+        await gs.advance_quests(db, user.id, "lesson_complete")
         await gs.check_and_unlock_achievements(db, user)
 
     # Close study session if one was provided

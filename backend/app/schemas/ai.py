@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 
 class TutorRequest(BaseModel):
-    # Frontend sends: { message, subject, history }
     message: Optional[str] = None          # frontend field name
     question: Optional[str] = None         # legacy backend field
     context: Optional[str] = None
@@ -24,7 +23,6 @@ class TutorRequest(BaseModel):
 
 
 class TutorResponse(BaseModel):
-    # Frontend expects: { reply, timestamp, suggestedFollowUps }
     reply: str
     answer: Optional[str] = None          # legacy field alias
     timestamp: Optional[str] = None
@@ -33,35 +31,42 @@ class TutorResponse(BaseModel):
 
 
 class StudyPlanRequest(BaseModel):
-    # Frontend fields (camelCase)
-    dailyHours: Optional[float] = None
-    targetGrade: Optional[str] = None
-    weakTopics: Optional[list[str]] = None
-    deadlines: Optional[list[str]] = None
+    # Mode selection: "custom_range" | "exam_prep"
+    mode: Optional[str] = "custom_range"
 
-    # Backend/legacy fields (snake_case)
-    subjects: Optional[list[str]] = None
+    # Custom Date Range Plan fields
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+
+    # Exam Prep Plan fields
     exam_date: Optional[str] = None
+    examDate: Optional[str] = None
+    target_grade: Optional[str] = None
+    targetGrade: Optional[str] = None
+    preparation_level: Optional[str] = None
+    preparationLevel: Optional[str] = None
+
+    # Shared parameters
+    dailyHours: Optional[float] = None
     daily_hours: Optional[float] = None
+    subjects: Optional[list[str]] = None
+    weakTopics: Optional[list[str]] = None
+    weak_topics: Optional[list[str]] = None
+    weakFocus: Optional[str] = None
     goals: Optional[str] = None
 
-    # Resolved fields — computed after init
+    # Resolved fields computed in init
+    effective_mode: str = "custom_range"
     effective_daily_hours: float = 2.0
     effective_subjects: list[str] = []
 
     model_config = {"populate_by_name": True}
 
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        instance = super().model_validate(obj, **kwargs)
-        instance.effective_daily_hours = instance.dailyHours or instance.daily_hours or 2.0
-        instance.effective_subjects = instance.subjects or [
-            "DBMS", "Operating Systems", "DSA", "Computer Networks", "AI/ML"
-        ]
-        return instance
-
     def __init__(self, **data):
         super().__init__(**data)
+        self.effective_mode = self.mode or ("exam_prep" if (self.exam_date or self.examDate) else "custom_range")
         self.effective_daily_hours = self.dailyHours or self.daily_hours or 2.0
         self.effective_subjects = self.subjects or [
             "DBMS", "Operating Systems", "DSA", "Computer Networks", "AI/ML"
@@ -76,10 +81,6 @@ class StudyPlanResponse(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    """
-    Frontend expects: { id, type, subject, title, reason, duration, xpPotential,
-                        difficulty, badge, actionUrl, actionLabel }
-    """
     id: Any                               # UUID or string
     type: Optional[str] = None            # frontend field
     recommendation_type: Optional[str] = None  # backend field

@@ -96,6 +96,9 @@ class LeaderboardEntry(BaseModel):
     rank: int
     user_id: UUID
     full_name: str
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    avatar: Optional[str] = None
     university: Optional[str] = None
     department: Optional[str] = None
     xp: int
